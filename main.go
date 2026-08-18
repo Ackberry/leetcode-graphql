@@ -17,7 +17,7 @@ type graphQLRequest struct {
 type graphQLResponse struct {
 	Data struct {
 		MatchedUser *struct {
-			Username string `json:"username`
+			Username string `json:"username"`
 		} `json:"matchedUser"`
 	} `json:"data"`
 }
@@ -69,10 +69,10 @@ func userExists(username string) (bool, error) {
 		"application/json",
 		bytes.NewBuffer(jsonBody),
 	)
-	defer resp.Body.Close()
 	if err != nil {
 		return false, err
 	}
+	defer resp.Body.Close()
 
 	var result graphQLResponse
 	err = json.NewDecoder(resp.Body).Decode(&result)
