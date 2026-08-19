@@ -53,32 +53,34 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, errorResponse{
+		Error: message,
+	})
+}
+
+func writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	json.NewEncoder(w).Encode(data)
+}
+
 // handlers
 func handleUserExists(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.PathValue("username"))
 	if username == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-
-		json.NewEncoder(w).Encode(errorResponse{
-			Error: "username is required",
-		})
+		writeJSONError(w, http.StatusBadRequest, "username is required")
 		return
 	}
 
 	exists, err := leetcodeUserExists(username)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-
-		json.NewEncoder(w).Encode(errorResponse{
-			Error: "failed to connect to leetcode. try again",
-		})
+		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(userExistsResponse{
+	writeJSON(w, http.StatusOK, userExistsResponse{
 		Username: username,
 		Exists:   exists,
 	})
