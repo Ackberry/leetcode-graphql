@@ -105,6 +105,7 @@ func userExists(username string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("leetcode returned status %d", resp.StatusCode)
@@ -115,7 +116,6 @@ func userExists(username string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
 	if len(result.Errors) > 0 {
 		return false, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message) // first error only for simplicity
 	}
