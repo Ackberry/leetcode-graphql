@@ -9,13 +9,16 @@ import (
 	"time"
 )
 
+// constants
 var leetcode = "https://leetcode.com/graphql"
 
+// GraphQL request struct
 type graphQLRequest struct {
 	Query     string         `json:"query"`
 	Variables map[string]any `json:"variables"`
 }
 
+// GraphQL response struct
 type graphQLResponse struct {
 	Data struct {
 		MatchedUser *struct {
@@ -28,6 +31,7 @@ type graphQLResponse struct {
 	} `json:"errors"`
 }
 
+// main
 func main() {
 
 	http.HandleFunc("GET /users/{username}/exists", handleUserExists)
@@ -49,14 +53,20 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
+// handlers
 func handleUserExists(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.PathValue("username"))
 	if username == "" {
-		http.Error(w, "username is required", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+
+		json.NewEncoder(w).Encode(errorResponse{
+			Error: "username is required",
+		})
 		return
 	}
 
-	exists, err := userExists(username)
+	exists, err := leetcodeUserExists(username)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -74,7 +84,8 @@ func handleUserExists(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func userExists(username string) (bool, error) {
+// leetcode helpers
+func leetcodeUserExists(username string) (bool, error) {
 	query := `
 		query getUser($username: String!) {
 		matchedUser(username: $username) {
