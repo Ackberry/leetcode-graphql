@@ -132,6 +132,11 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 
 	profile, err := leetcodeUserProfile(username)
 	if err != nil {
+		if err.Error() == "user not found" {
+			writeJSONError(w, http.StatusNotFound, "user not found")
+			return
+		}
+
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		return
 	}
