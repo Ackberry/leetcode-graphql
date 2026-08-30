@@ -44,7 +44,7 @@ func main() {
 	fmt.Println("starting server on 8080")
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/users//exists" || r.URL.Path == "/users//profile" {
+		if r.URL.Path == "/users//exists" || r.URL.Path == "/users//profile" || r.URL.Path == "/users//stats" {
 			writeJSONError(w, http.StatusBadRequest, "username is required")
 			return
 		}
