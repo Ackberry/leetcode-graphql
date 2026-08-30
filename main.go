@@ -136,7 +136,7 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusNotFound, "user not found")
 			return
 		}
-
+		fmt.Printf("profile error: %s", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		return
 	}
@@ -200,12 +200,13 @@ func leetcodeUserProfile(username string) (userProfileResponse, error) {
 	if err != nil {
 		return userProfileResponse{}, err
 	}
-	if len(result.Errors) > 0 {
-		return userProfileResponse{}, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message)
-	}
 
 	if result.Data.MatchedUser == nil {
 		return userProfileResponse{}, fmt.Errorf("user not found")
+	}
+
+	if len(result.Errors) > 0 {
+		return userProfileResponse{}, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message)
 	}
 	return *result.Data.MatchedUser, nil
 }
