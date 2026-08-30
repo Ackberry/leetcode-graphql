@@ -61,7 +61,7 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 	})
 }
 
-func errorCodeCheck(statusCode int) error {
+func checkLeetcodeStatus(statusCode int) error {
 	if statusCode != http.StatusOK {
 		return fmt.Errorf("leetcode returned status %d", statusCode)
 	}
@@ -138,7 +138,7 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		fmt.Printf("profile error: %s", err)
+		fmt.Printf("profile error: %s\n", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		return
 	}
@@ -193,7 +193,7 @@ func leetcodeUserProfile(username string) (userProfileResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	if err := errorCodeCheck(resp.StatusCode); err != nil {
+	if err := checkLeetcodeStatus(resp.StatusCode); err != nil {
 		return userProfileResponse{}, err
 	}
 
@@ -247,7 +247,7 @@ func leetcodeUserExists(username string) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-	if err := errorCodeCheck(resp.StatusCode); err != nil {
+	if err := checkLeetcodeStatus(resp.StatusCode); err != nil {
 		return false, err
 	}
 
