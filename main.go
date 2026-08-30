@@ -225,9 +225,6 @@ func leetcodeUserProfile(username string) (userProfileResponse, error) {
 
 // leetcode helpers
 func leetcodeUserExists(username string) (bool, error) {
-	if username == "" {
-
-	}
 
 	query := `
 		query getUser($username: String!) {
