@@ -86,6 +86,40 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	json.NewEncoder(w).Encode(data)
 }
 
+func postGraphQL(query string, variables map[string]any, result any) error {
+	body := graphQLRequest{
+		Query:     query,
+		Variables: variables,
+	}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Post(
+		leetcode,
+		"application/json",
+		bytes.NewBuffer(jsonBody),
+	)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if err := checkLeetcodeStatus(resp.StatusCode); err != nil {
+		return err
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(result)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // handlers
 func handleUserExists(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.PathValue("username"))
@@ -186,30 +220,8 @@ func leetcodeUserProfile(username string) (userProfileResponse, error) {
 			"username": username,
 		},
 	}
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return userProfileResponse{}, err
-	}
-
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
-	resp, err := client.Post(
-		leetcode,
-		"application/json",
-		bytes.NewBuffer(jsonBody),
-	)
-	if err != nil {
-		return userProfileResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	if err := checkLeetcodeStatus(resp.StatusCode); err != nil {
-		return userProfileResponse{}, err
-	}
-
 	var result graphQLUserProfileResponse
-	err = json.NewDecoder(resp.Body).Decode(&result)
+	err := postGraphQL(body.Query, body.Variables, &result)
 	if err != nil {
 		return userProfileResponse{}, err
 	}
@@ -241,30 +253,8 @@ func leetcodeUserExists(username string) (bool, error) {
 		},
 	}
 
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return false, err
-	}
-
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
-	resp, err := client.Post(
-		leetcode,
-		"application/json",
-		bytes.NewBuffer(jsonBody),
-	)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	if err := checkLeetcodeStatus(resp.StatusCode); err != nil {
-		return false, err
-	}
-
 	var result graphQLResponse
-	err = json.NewDecoder(resp.Body).Decode(&result)
+	err := postGraphQL(body.Query, body.Variables, &result)
 	if err != nil {
 		return false, err
 	}
@@ -348,30 +338,8 @@ func leetcodeUserStats(username string) (userStatsResponse, error) {
 			"username": username,
 		},
 	}
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return userStatsResponse{}, err
-	}
-
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
-	resp, err := client.Post(
-		leetcode,
-		"application/json",
-		bytes.NewBuffer(jsonBody),
-	)
-	if err != nil {
-		return userStatsResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	if err := checkLeetcodeStatus(resp.StatusCode); err != nil {
-		return userStatsResponse{}, err
-	}
-
 	var result graphQLUserStatsResponse
-	err = json.NewDecoder(resp.Body).Decode(&result)
+	err := postGraphQL(body.Query, body.Variables, &result)
 	if err != nil {
 		return userStatsResponse{}, err
 	}
