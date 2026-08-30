@@ -36,11 +36,21 @@ type graphQLResponse struct {
 // main
 func main() {
 
-	http.HandleFunc("GET /users/{username}/exists", handleUserExists)
-	http.HandleFunc("GET /users/{username}/profile", handleUserProfile)
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /users/{username}/exists", handleUserExists)
+	mux.HandleFunc("GET /users/{username}/profile", handleUserProfile)
 	fmt.Println("starting server on 8080")
 
-	err := http.ListenAndServe(":8080", nil)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "//") {
+			writeJSONError(w, http.StatusBadRequest, "username is required")
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
+
+	err := http.ListenAndServe(":8080", handler)
 	if err != nil {
 		fmt.Println("server error: ", err)
 	}
@@ -215,6 +225,10 @@ func leetcodeUserProfile(username string) (userProfileResponse, error) {
 
 // leetcode helpers
 func leetcodeUserExists(username string) (bool, error) {
+	if username == "" {
+
+	}
+
 	query := `
 		query getUser($username: String!) {
 		matchedUser(username: $username) {
@@ -256,8 +270,13 @@ func leetcodeUserExists(username string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	if result.Data.MatchedUser == nil {
+		return false, nil
+	}
+
 	if len(result.Errors) > 0 {
 		return false, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message) // first error only for simplicity
 	}
-	return result.Data.MatchedUser != nil, nil
+	return true, nil
 }
