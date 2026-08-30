@@ -291,7 +291,7 @@ func handleUserStats(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		fmt.Printf("profile error: %s\n", err)
+		fmt.Printf("stats error: %s\n", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		return
 	}
