@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 // constants
 var leetcode = "https://leetcode.com/graphql"
+var errUserNotFound = errors.New("user not found")
 
 // GraphQL request struct
 type graphQLRequest struct {
@@ -132,7 +134,7 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 
 	profile, err := leetcodeUserProfile(username)
 	if err != nil {
-		if err.Error() == "user not found" {
+		if errors.Is(err, errUserNotFound) {
 			writeJSONError(w, http.StatusNotFound, "user not found")
 			return
 		}
@@ -202,7 +204,7 @@ func leetcodeUserProfile(username string) (userProfileResponse, error) {
 	}
 
 	if result.Data.MatchedUser == nil {
-		return userProfileResponse{}, fmt.Errorf("user not found")
+		return userProfileResponse{}, errUserNotFound
 	}
 
 	if len(result.Errors) > 0 {
