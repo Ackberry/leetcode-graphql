@@ -41,10 +41,11 @@ func main() {
 	mux.HandleFunc("GET /users/{username}/exists", handleUserExists)
 	mux.HandleFunc("GET /users/{username}/profile", handleUserProfile)
 	mux.HandleFunc("GET /users/{username}/stats", handleUserStats)
+	mux.HandleFunc("GET /users/{username}/submissions", handleUserSubmissions)
 	fmt.Println("starting server on 8080")
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/users//exists" || r.URL.Path == "/users//profile" || r.URL.Path == "/users//stats" {
+		if r.URL.Path == "/users//exists" || r.URL.Path == "/users//profile" || r.URL.Path == "/users//stats" || r.URL.Path == "/users//submissions" {
 			writeJSONError(w, http.StatusBadRequest, "username is required")
 			return
 		}
@@ -352,4 +353,72 @@ func leetcodeUserStats(username string) (userStatsResponse, error) {
 		return userStatsResponse{}, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message)
 	}
 	return *result.Data.MatchedUser, nil
+}
+
+func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.PathValue("username"))
+	if username == "" {
+		writeJSONError(w, http.StatusBadRequest, "username is required")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"hi": username,
+	})
+}
+
+type userSubmission struct {
+	Title         string `json:"title"`
+	TitleSlug     string `json:"titleSlug"`
+	Timestamp     string `json:"timestamp"`
+	StatusDisplay string `json:"statusDisplay"`
+	Lang          string `json:"lang"`
+}
+
+type userSubmissionsResponse struct {
+	Username          string           `json:"username"`
+	RecentSubmissions []userSubmission `json:"recentSubmissions"`
+}
+
+type graphQLUserSubmissionsResponse struct {
+	Data struct {
+		RecentSubmissionList []userSubmission `json:"recentSubmissionList"`
+	} `json:"data"`
+
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+func leetcodeUserSubmissions(username string, limit int) (userSubmissionsResponse, error) {
+	query := `
+		query getRecentSubmissions($username: String!, $limit: Int!) {
+			recentSubmissionList(username: $username, limit: $limit) {
+				title
+				titleSlug
+				timestamp
+				statusDisplay
+				lang
+			}
+		}
+	`
+	body := graphQLRequest{
+		Query: query,
+		Variables: map[string]any{
+			"username": username,
+			"limit":    limit,
+		},
+	}
+
+	var result graphQLUserSubmissionsResponse
+	err := postGraphQL(body.Query, body.Variables, &result)
+	if err != nil {
+		return userSubmissionsResponse{}, err
+	}
+	if len(result.Errors) > 0 {
+		return userSubmissionsResponse{}, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message)
+	}
+	return userSubmissionsResponse{
+		Username:          username,
+		RecentSubmissions: result.Data.RecentSubmissionList,
+	}, nil
 }
