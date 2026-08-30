@@ -361,12 +361,19 @@ func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "username is required")
 		return
 	}
+
+	ok, err := leetcodeUserExists(username)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
+		return
+	}
+	if !ok {
+		writeJSONError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
 	recentSubmissions, err := leetcodeUserSubmissions(username, 10)
 	if err != nil {
-		if errors.Is(err, errUserNotFound) {
-			writeJSONError(w, http.StatusNotFound, "user not found")
-			return
-		}
 		fmt.Printf("recent submissions error: %s\n", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		return
