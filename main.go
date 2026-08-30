@@ -130,6 +130,7 @@ func handleUserExists(w http.ResponseWriter, r *http.Request) {
 
 	exists, err := leetcodeUserExists(username)
 	if err != nil {
+		fmt.Printf("exists error: %s\n", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		return
 	}
