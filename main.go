@@ -40,10 +40,11 @@ func main() {
 
 	mux.HandleFunc("GET /users/{username}/exists", handleUserExists)
 	mux.HandleFunc("GET /users/{username}/profile", handleUserProfile)
+	mux.HandleFunc("GET /users/{username}/stats", handleUserStats)
 	fmt.Println("starting server on 8080")
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "//") {
+		if r.URL.Path == "/users//exists" || r.URL.Path == "/users//profile" {
 			writeJSONError(w, http.StatusBadRequest, "username is required")
 			return
 		}
@@ -276,4 +277,110 @@ func leetcodeUserExists(username string) (bool, error) {
 		return false, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message) // first error only for simplicity
 	}
 	return true, nil
+}
+
+func handleUserStats(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.PathValue("username"))
+	if username == "" {
+		writeJSONError(w, http.StatusBadRequest, "username is required")
+		return
+	}
+	stats, err := leetcodeUserStats(username)
+	if err != nil {
+		if errors.Is(err, errUserNotFound) {
+			writeJSONError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		fmt.Printf("profile error: %s\n", err)
+		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
+}
+
+type submissionStat struct {
+	Difficulty  string `json:"difficulty"`
+	Count       int    `json:"count"`
+	Submissions int    `json:"submissions"`
+}
+
+type userStatsResponse struct {
+	Username    string `json:"username"`
+	SubmitStats struct {
+		AcceptedSubmissions []submissionStat `json:"acSubmissionNum"`
+		TotalSubmissions    []submissionStat `json:"totalSubmissionNum"`
+	} `json:"submitStats"`
+}
+
+type graphQLUserStatsResponse struct {
+	Data struct {
+		MatchedUser *userStatsResponse `json:"matchedUser"`
+	} `json:"data"`
+
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+func leetcodeUserStats(username string) (userStatsResponse, error) {
+	query := `
+		query getUserStats($username: String!) {
+			matchedUser(username: $username) {
+				username
+				submitStats {
+					acSubmissionNum {
+					difficulty
+					count
+					submissions
+					}
+					totalSubmissionNum {
+					difficulty
+					count
+					submissions
+					}
+				}
+			}
+		}
+	`
+	body := graphQLRequest{
+		Query: query,
+		Variables: map[string]any{
+			"username": username,
+		},
+	}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return userStatsResponse{}, err
+	}
+
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Post(
+		leetcode,
+		"application/json",
+		bytes.NewBuffer(jsonBody),
+	)
+	if err != nil {
+		return userStatsResponse{}, err
+	}
+	defer resp.Body.Close()
+
+	if err := checkLeetcodeStatus(resp.StatusCode); err != nil {
+		return userStatsResponse{}, err
+	}
+
+	var result graphQLUserStatsResponse
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return userStatsResponse{}, err
+	}
+
+	if result.Data.MatchedUser == nil {
+		return userStatsResponse{}, errUserNotFound
+	}
+	if len(result.Errors) > 0 {
+		return userStatsResponse{}, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message)
+	}
+	return *result.Data.MatchedUser, nil
 }
