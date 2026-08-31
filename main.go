@@ -133,7 +133,6 @@ func parseLimit(r *http.Request, defaultLimit int, maxLimit int) (int, error) {
 		}
 	}
 	return parsedLimit, nil
-
 }
 
 // handlers
@@ -377,16 +376,6 @@ func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parsedLimit := 10
-	var err error
-	limitParam := r.URL.Query().Get("limit")
-	if limitParam != "" {
-		parsedLimit, err = strconv.Atoi(limitParam)
-		if err != nil || parsedLimit <= 0 || parsedLimit > 20 {
-			writeJSONError(w, http.StatusBadRequest, "limit must be an integer between 1 and 20")
-			return
-		}
-	}
 	limit, err := parseLimit(r, 10, 20)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
