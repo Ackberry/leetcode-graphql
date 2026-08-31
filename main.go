@@ -122,6 +122,20 @@ func postGraphQL(query string, variables map[string]any, result any) error {
 	return nil
 }
 
+func parseLimit(r *http.Request, defaultLimit int, maxLimit int) (int, error) {
+	parsedLimit := defaultLimit
+	var err error
+	limitParam := r.URL.Query().Get("limit")
+	if limitParam != "" {
+		parsedLimit, err = strconv.Atoi(limitParam)
+		if err != nil || parsedLimit <= 0 || parsedLimit > maxLimit {
+			return 0, fmt.Errorf("limit must be an integer between %d and %d", 1, maxLimit)
+		}
+	}
+	return parsedLimit, nil
+
+}
+
 // handlers
 func handleUserExists(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.PathValue("username"))
@@ -373,6 +387,11 @@ func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	limit, err := parseLimit(r, 10, 20)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	ok, err := leetcodeUserExists(username)
 	if err != nil {
@@ -384,7 +403,7 @@ func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recentSubmissions, err := leetcodeUserSubmissions(username, parsedLimit)
+	recentSubmissions, err := leetcodeUserSubmissions(username, limit)
 	if err != nil {
 		fmt.Printf("recent submissions error: %s\n", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
