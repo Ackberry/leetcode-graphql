@@ -15,6 +15,9 @@ import (
 // constants
 var leetcode = "https://leetcode.com/graphql"
 var errUserNotFound = errors.New("user not found")
+var leetcodeClient = &http.Client{
+	Timeout: 5 * time.Second,
+}
 
 // GraphQL request struct
 type graphQLRequest struct {
@@ -107,9 +110,6 @@ func postGraphQL(ctx context.Context, query string, variables map[string]any, re
 		return err
 	}
 
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
 	req, err := http.NewRequestWithContext(ctx,
 		http.MethodPost,
 		leetcode,
@@ -118,7 +118,7 @@ func postGraphQL(ctx context.Context, query string, variables map[string]any, re
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := leetcodeClient.Do(req)
 	if err != nil {
 		return err
 	}
