@@ -53,7 +53,15 @@ func main() {
 		mux.ServeHTTP(w, r)
 	})
 
-	err := http.ListenAndServe(":8080", handler)
+	server := &http.Server{
+		Addr:              ":8080",
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	err := server.ListenAndServe()
 	if err != nil {
 		fmt.Println("server error: ", err)
 	}
