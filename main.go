@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -362,6 +363,17 @@ func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	parsedLimit := 10
+	var err error
+	limitParam := r.URL.Query().Get("limit")
+	if limitParam != "" {
+		parsedLimit, err = strconv.Atoi(limitParam)
+		if err != nil || parsedLimit <= 0 || parsedLimit > 20 {
+			writeJSONError(w, http.StatusBadRequest, "limit must be an integer between 1 and 20")
+			return
+		}
+	}
+
 	ok, err := leetcodeUserExists(username)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
@@ -372,7 +384,7 @@ func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recentSubmissions, err := leetcodeUserSubmissions(username, 10)
+	recentSubmissions, err := leetcodeUserSubmissions(username, parsedLimit)
 	if err != nil {
 		fmt.Printf("recent submissions error: %s\n", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
