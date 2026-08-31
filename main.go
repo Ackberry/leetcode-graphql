@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -96,7 +97,7 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	json.NewEncoder(w).Encode(data)
 }
 
-func postGraphQL(query string, variables map[string]any, result any) error {
+func postGraphQL(ctx context.Context, query string, variables map[string]any, result any) error {
 	body := graphQLRequest{
 		Query:     query,
 		Variables: variables,
@@ -109,11 +110,15 @@ func postGraphQL(query string, variables map[string]any, result any) error {
 	client := http.Client{
 		Timeout: 5 * time.Second,
 	}
-	resp, err := client.Post(
+	req, err := http.NewRequestWithContext(ctx,
+		http.MethodPost,
 		leetcode,
-		"application/json",
-		bytes.NewBuffer(jsonBody),
-	)
+		bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	if err != nil {
+		return err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -151,7 +156,7 @@ func handleUserExists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, err := leetcodeUserExists(username)
+	exists, err := leetcodeUserExists(r.Context(), username)
 	if err != nil {
 		fmt.Printf("exists error: %s\n", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
@@ -201,7 +206,7 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := leetcodeUserProfile(username)
+	profile, err := leetcodeUserProfile(r.Context(), username)
 	if err != nil {
 		if errors.Is(err, errUserNotFound) {
 			writeJSONError(w, http.StatusNotFound, "user not found")
@@ -214,7 +219,7 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, profile)
 }
 
-func leetcodeUserProfile(username string) (userProfileResponse, error) {
+func leetcodeUserProfile(ctx context.Context, username string) (userProfileResponse, error) {
 	query := `
 		query getUserProfile($username: String!){
 			matchedUser(username: $username) {
@@ -245,7 +250,7 @@ func leetcodeUserProfile(username string) (userProfileResponse, error) {
 		},
 	}
 	var result graphQLUserProfileResponse
-	err := postGraphQL(body.Query, body.Variables, &result)
+	err := postGraphQL(ctx, body.Query, body.Variables, &result)
 	if err != nil {
 		return userProfileResponse{}, err
 	}
@@ -261,7 +266,7 @@ func leetcodeUserProfile(username string) (userProfileResponse, error) {
 }
 
 // leetcode helpers
-func leetcodeUserExists(username string) (bool, error) {
+func leetcodeUserExists(ctx context.Context, username string) (bool, error) {
 
 	query := `
 		query getUser($username: String!) {
@@ -278,7 +283,7 @@ func leetcodeUserExists(username string) (bool, error) {
 	}
 
 	var result graphQLResponse
-	err := postGraphQL(body.Query, body.Variables, &result)
+	err := postGraphQL(ctx, body.Query, body.Variables, &result)
 	if err != nil {
 		return false, err
 	}
@@ -299,7 +304,7 @@ func handleUserStats(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "username is required")
 		return
 	}
-	stats, err := leetcodeUserStats(username)
+	stats, err := leetcodeUserStats(r.Context(), username)
 	if err != nil {
 		if errors.Is(err, errUserNotFound) {
 			writeJSONError(w, http.StatusNotFound, "user not found")
@@ -336,7 +341,7 @@ type graphQLUserStatsResponse struct {
 	} `json:"errors"`
 }
 
-func leetcodeUserStats(username string) (userStatsResponse, error) {
+func leetcodeUserStats(ctx context.Context, username string) (userStatsResponse, error) {
 	query := `
 		query getUserStats($username: String!) {
 			matchedUser(username: $username) {
@@ -363,7 +368,7 @@ func leetcodeUserStats(username string) (userStatsResponse, error) {
 		},
 	}
 	var result graphQLUserStatsResponse
-	err := postGraphQL(body.Query, body.Variables, &result)
+	err := postGraphQL(ctx, body.Query, body.Variables, &result)
 	if err != nil {
 		return userStatsResponse{}, err
 	}
@@ -390,7 +395,7 @@ func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err := leetcodeUserExists(username)
+	ok, err := leetcodeUserExists(r.Context(), username)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		return
@@ -400,7 +405,7 @@ func handleUserSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recentSubmissions, err := leetcodeUserSubmissions(username, limit)
+	recentSubmissions, err := leetcodeUserSubmissions(r.Context(), username, limit)
 	if err != nil {
 		fmt.Printf("recent submissions error: %s\n", err)
 		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
@@ -432,7 +437,7 @@ type graphQLUserSubmissionsResponse struct {
 	} `json:"errors"`
 }
 
-func leetcodeUserSubmissions(username string, limit int) (userSubmissionsResponse, error) {
+func leetcodeUserSubmissions(ctx context.Context, username string, limit int) (userSubmissionsResponse, error) {
 	query := `
 		query getRecentSubmissions($username: String!, $limit: Int!) {
 			recentSubmissionList(username: $username, limit: $limit) {
@@ -453,7 +458,7 @@ func leetcodeUserSubmissions(username string, limit int) (userSubmissionsRespons
 	}
 
 	var result graphQLUserSubmissionsResponse
-	err := postGraphQL(body.Query, body.Variables, &result)
+	err := postGraphQL(ctx, body.Query, body.Variables, &result)
 	if err != nil {
 		return userSubmissionsResponse{}, err
 	}
