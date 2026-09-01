@@ -10,25 +10,38 @@ import (
 func TestEmptyUsernameReturnsBadRequest(t *testing.T) {
 	handler := newServerHandler()
 
-	req := httptest.NewRequest(http.MethodGet, "/users//exists", nil)
-	recorder := httptest.NewRecorder()
-
-	handler.ServeHTTP(recorder, req)
-
-	resp := recorder.Result()
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", resp.StatusCode)
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "exists", path: "/users//exists"},
+		{name: "profile", path: "/users//profile"},
+		{name: "stats", path: "/users//stats"},
+		{name: "submissions", path: "/users//submissions"},
 	}
 
-	var body errorResponse
-	err := json.NewDecoder(resp.Body).Decode(&body)
-	if err != nil {
-		t.Fatalf("expected valid JSON body, got %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/users//exists", nil)
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, req)
 
-	if body.Error != "username is required" {
-		t.Fatalf("expected error %q, got %q", "username is required", body.Error)
+			resp := recorder.Result()
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("expected status 400, got %d", resp.StatusCode)
+			}
+
+			var body errorResponse
+			err := json.NewDecoder(resp.Body).Decode(&body)
+			if err != nil {
+				t.Fatalf("expected valid JSON body, got %v", err)
+			}
+
+			if body.Error != "username is required" {
+				t.Fatalf("expected error %q, got %q", "username is required", body.Error)
+			}
+		})
 	}
 }
