@@ -25,7 +25,8 @@ func htmlToText(htmlString string) string {
 	appendText := func(text string) {
 		words := strings.Fields(text)
 		for _, word := range words {
-			if !atLineStart && !noSpaceBeforeNext {
+			noSpaceBeforeWord := strings.ContainsRune(".,;:?!)]}", rune(word[0]))
+			if !atLineStart && !noSpaceBeforeNext && !noSpaceBeforeWord {
 				builder.WriteString(" ")
 			}
 			builder.WriteString(word)
