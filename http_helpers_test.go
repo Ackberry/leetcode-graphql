@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -79,5 +80,15 @@ func TestWriteJSONError(t *testing.T) {
 
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Fatalf("expected content type application/json, got %s", resp.Header.Get("Content-Type"))
+	}
+
+	var body errorResponse
+
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+	if body.Error != "limit must be valid" {
+		t.Fatalf("expected error message %q, got %q", "limit must be valid", body.Error)
 	}
 }
