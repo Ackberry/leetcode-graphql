@@ -64,3 +64,20 @@ func TestParseLimitRejectsInvalidLimits(t *testing.T) {
 
 	}
 }
+
+func TestWriteJSONError(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	writeJSONError(recorder, http.StatusBadRequest, "limit must be valid")
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", resp.StatusCode)
+	}
+
+	if resp.Header.Get("Content-Type") != "application/json" {
+		t.Fatalf("expected content type application/json, got %s", resp.Header.Get("Content-Type"))
+	}
+}
