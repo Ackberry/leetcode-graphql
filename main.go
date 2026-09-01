@@ -10,11 +10,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 )
 
 // constants
 var leetcode = "https://leetcode.com/graphql"
 var errUserNotFound = errors.New("user not found")
+var errProblemNotFound = errors.New("problem not found")
 var leetcodeClient = &http.Client{
 	Timeout: 5 * time.Second,
 }
@@ -47,6 +50,7 @@ func main() {
 	mux.HandleFunc("GET /users/{username}/profile", handleUserProfile)
 	mux.HandleFunc("GET /users/{username}/stats", handleUserStats)
 	mux.HandleFunc("GET /users/{username}/submissions", handleUserSubmissions)
+	mux.HandleFunc("GET /problems/{slug}", handleProblem)
 	fmt.Println("starting server on 8080")
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +150,30 @@ func parseLimit(r *http.Request, defaultLimit int, maxLimit int) (int, error) {
 		}
 	}
 	return parsedLimit, nil
+}
+
+func htmlToText(htmlString string) string {
+	doc, err := html.Parse(strings.NewReader(htmlString))
+	if err != nil {
+		return htmlString
+	}
+
+	var parts []string
+
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			text := strings.TrimSpace(n.Data)
+			if text != "" {
+				parts = append(parts, text)
+			}
+		}
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
+		}
+	}
+	walk(doc)
+	return strings.Join(parts, " ")
 }
 
 // handlers
@@ -469,4 +497,95 @@ func leetcodeUserSubmissions(ctx context.Context, username string, limit int) (u
 		Username:          username,
 		RecentSubmissions: result.Data.RecentSubmissionList,
 	}, nil
+}
+
+func handleProblem(w http.ResponseWriter, r *http.Request) {
+	slug := strings.TrimSpace(r.PathValue("slug"))
+	if slug == "" {
+		writeJSONError(w, http.StatusBadRequest, "problem slug is required")
+		return
+	}
+
+	problem, err := leetcodeProblem(r.Context(), slug)
+	if err != nil {
+		if errors.Is(err, errProblemNotFound) {
+			writeJSONError(w, http.StatusNotFound, "problem not found")
+			return
+		}
+		fmt.Printf("problem error: %s\n", err)
+		writeJSONError(w, http.StatusInternalServerError, "failed to connect to leetcode. try again")
+		return
+	}
+	writeJSON(w, http.StatusOK, problem)
+}
+
+type topicTag struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+type problemResponse struct {
+	QuestionFrontendID string     `json:"questionFrontendId"`
+	Title              string     `json:"title"`
+	TitleSlug          string     `json:"titleSlug"`
+	Difficulty         string     `json:"difficulty"`
+	IsPaidOnly         bool       `json:"isPaidOnly"`
+	ACRate             float64    `json:"acRate"`
+	Likes              int        `json:"likes"`
+	Dislikes           int        `json:"dislikes"`
+	Content            string     `json:"content"`
+	TopicTags          []topicTag `json:"topicTags"`
+}
+
+type graphQLProblemResponse struct {
+	Data struct {
+		Question *problemResponse `json:"question"`
+	} `json:"data"`
+
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+func leetcodeProblem(ctx context.Context, slug string) (problemResponse, error) {
+	query := `query getProblem($titleSlug: String!) {
+		question(titleSlug: $titleSlug) {
+			questionFrontendId
+			title
+			titleSlug
+			difficulty
+			isPaidOnly
+			acRate
+			likes
+			dislikes
+			content
+			topicTags {
+				name
+				slug
+			}
+		}
+	}`
+
+	body := graphQLRequest{
+		Query: query,
+		Variables: map[string]any{
+			"titleSlug": slug,
+		},
+	}
+	var result graphQLProblemResponse
+
+	err := postGraphQL(ctx, body.Query, body.Variables, &result)
+	if err != nil {
+		return problemResponse{}, err
+	}
+	if result.Data.Question == nil {
+		return problemResponse{}, errProblemNotFound
+	}
+	if len(result.Errors) > 0 {
+		return problemResponse{}, fmt.Errorf("leetcode graphql error: %s", result.Errors[0].Message)
+	}
+	problem := *result.Data.Question
+	problem.Content = htmlToText(problem.Content)
+
+	return problem, nil
 }
