@@ -1,0 +1,66 @@
+package main
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func TestParseLimitUsingDefaultWhenMissing(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/submissions", nil)
+
+	limit, err := parseLimit(req, 10, 20)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if limit != 10 {
+		t.Fatalf("expected limit 10, got %d", limit)
+	}
+}
+
+func TestParseLimitUsesQueryLimit(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/submissions?limit=5", nil)
+
+	limit, err := parseLimit(req, 10, 20)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if limit != 5 {
+		t.Fatalf("expected limit 5, got %d", limit)
+	}
+}
+
+func TestParseLimitRejectsInvalidLimits(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{{
+		name: "non integer",
+		url:  "/users/jimmytrivedi/submissions?limit=abc",
+	},
+		{
+			name: "zero",
+			url:  "/users/jimmytrivedi/submissions?limit=0",
+		},
+		{
+			name: "negative",
+			url:  "/users/jimmytrivedi/submissions?limit=-12",
+		},
+		{
+			name: "above max",
+			url:  "/users/jimmytrivedi/submissions?limit=33",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
+
+			_, err := parseLimit(req, 10, 20)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+		})
+
+	}
+}
