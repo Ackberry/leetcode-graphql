@@ -101,7 +101,9 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
-	json.NewEncoder(w).Encode(data)
+	encoder := json.NewEncoder(w)
+	encoder.SetEscapeHTML(false)
+	encoder.Encode(data)
 }
 
 func postGraphQL(ctx context.Context, query string, variables map[string]any, result any) error {
@@ -158,22 +160,85 @@ func htmlToText(htmlString string) string {
 		return htmlString
 	}
 
-	var parts []string
+	var builder strings.Builder
+	atLineStart := true
+	noSpaceBeforeNext := false
+
+	appendText := func(text string) {
+		words := strings.Fields(text)
+		for _, word := range words {
+			if !atLineStart && !noSpaceBeforeNext {
+				builder.WriteString(" ")
+			}
+			builder.WriteString(word)
+			atLineStart = false
+			noSpaceBeforeNext = false
+		}
+	}
+
+	appendNewline := func() {
+		current := builder.String()
+		if current == "" || strings.HasSuffix(current, "\n\n") {
+			atLineStart = true
+			return
+		}
+		if strings.HasSuffix(current, "\n") {
+			builder.WriteString("\n")
+		} else {
+			builder.WriteString("\n\n")
+		}
+		atLineStart = true
+	}
+
+	appendLineBreak := func() {
+		current := builder.String()
+		if current == "" || strings.HasSuffix(current, "\n") {
+			atLineStart = true
+			return
+		}
+		builder.WriteString("\n")
+		atLineStart = true
+	}
 
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style") {
+			return
+		}
+
 		if n.Type == html.TextNode {
-			text := strings.TrimSpace(n.Data)
-			if text != "" {
-				parts = append(parts, text)
+			appendText(n.Data)
+			return
+		}
+
+		if n.Type == html.ElementNode {
+			switch n.Data {
+			case "br":
+				appendLineBreak()
+				return
+			case "p", "div", "pre", "ul", "ol":
+				appendNewline()
+				defer appendNewline()
+			case "li":
+				appendLineBreak()
+				builder.WriteString("- ")
+				atLineStart = false
+				noSpaceBeforeNext = true
+				defer appendLineBreak()
+			case "sup":
+				builder.WriteString("^")
+				atLineStart = false
+				noSpaceBeforeNext = true
 			}
 		}
+
 		for child := n.FirstChild; child != nil; child = child.NextSibling {
 			walk(child)
 		}
 	}
+
 	walk(doc)
-	return strings.Join(parts, " ")
+	return strings.TrimSpace(builder.String())
 }
 
 // handlers
