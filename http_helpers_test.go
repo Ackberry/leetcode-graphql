@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -90,5 +92,30 @@ func TestWriteJSONError(t *testing.T) {
 	}
 	if body.Error != "limit must be valid" {
 		t.Fatalf("expected error message %q, got %q", "limit must be valid", body.Error)
+	}
+}
+
+func TestWriteJSONDoesNotEscapeHTML(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	writeJSON(recorder, http.StatusOK, map[string]string{
+		"content": "2 <= nums.length && nums.length <= 10",
+	})
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("expected readable body, got %v", err)
+	}
+
+	body := string(bodyBytes)
+	if !strings.Contains(body, "2 <= nums.length && nums.length <= 10") {
+		t.Fatalf("expected unescaped content, got %q", body)
+	}
+
+	if strings.Contains(body, "\\u003c") || strings.Contains(body, "\\u003e") || strings.Contains(body, "\\u0026") {
+		t.Fatalf("expected HTML characters not to be escaped, got %q", body)
 	}
 }
