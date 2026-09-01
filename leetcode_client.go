@@ -15,6 +15,11 @@ var leetcodeClient = &http.Client{
 	Timeout: 5 * time.Second,
 }
 
+type graphQLRequest struct {
+	Query     string         `json:"query"`
+	Variables map[string]any `json:"variables"`
+}
+
 func checkLeetcodeStatus(statusCode int) error {
 	if statusCode != http.StatusOK {
 		return fmt.Errorf("leetcode returned status %d", statusCode)

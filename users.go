@@ -16,6 +16,18 @@ type userExistsResponse struct {
 	Exists   bool   `json:"exists"`
 }
 
+type graphQLResponse struct {
+	Data struct {
+		MatchedUser *struct {
+			Username string `json:"username"`
+		} `json:"matchedUser"`
+	} `json:"data"`
+
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
 type userProfileResponse struct {
 	Username    string `json:"username"`
 	GithubURL   string `json:"githubUrl"`
@@ -58,6 +70,16 @@ type userStatsResponse struct {
 		AcceptedSubmissions []submissionStat `json:"acSubmissionNum"`
 		TotalSubmissions    []submissionStat `json:"totalSubmissionNum"`
 	} `json:"submitStats"`
+}
+
+type graphQLUserStatsResponse struct {
+	Data struct {
+		MatchedUser *userStatsResponse `json:"matchedUser"`
+	} `json:"data"`
+
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
 }
 
 type userSubmission struct {
