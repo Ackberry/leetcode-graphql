@@ -11,7 +11,7 @@ import (
 )
 
 // Tests using the fake must remain serial because leetcode is a shared endpoint.
-func fakeGraphQL(t *testing.T, operation string, variables map[string]any, response string) {
+func withFakeLeetcode(t *testing.T, operation string, variables map[string]any, response string) {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

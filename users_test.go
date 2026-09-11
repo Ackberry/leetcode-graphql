@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 )
 
 func TestLeetcodeUserExistsReturnsFalse(t *testing.T) {
-	fakeGraphQL(t, "getUser", map[string]any{"username": "missing-user"},
+	withFakeLeetcode(t, "getUser", map[string]any{"username": "missing-user"},
 		`{"data":{"matchedUser":null}}`)
 
 	exists, err := leetcodeUserExists(context.Background(), "missing-user")
@@ -24,7 +21,7 @@ func TestLeetcodeUserExistsReturnsFalse(t *testing.T) {
 }
 
 func TestLeetcodeUserProfileUserNotFound(t *testing.T) {
-	fakeGraphQL(t, "getUserProfile", map[string]any{"username": "missing-user"},
+	withFakeLeetcode(t, "getUserProfile", map[string]any{"username": "missing-user"},
 		`{"data":{"matchedUser":null}}`)
 
 	_, err := leetcodeUserProfile(context.Background(), "missing-user")
@@ -34,7 +31,7 @@ func TestLeetcodeUserProfileUserNotFound(t *testing.T) {
 }
 
 func TestLeetcodeUserStatsUserNotFound(t *testing.T) {
-	fakeGraphQL(t, "getUserStats", map[string]any{"username": "missing-user"},
+	withFakeLeetcode(t, "getUserStats", map[string]any{"username": "missing-user"},
 		`{"data":{"matchedUser":null}}`)
 
 	_, err := leetcodeUserStats(context.Background(), "missing-user")
@@ -44,7 +41,7 @@ func TestLeetcodeUserStatsUserNotFound(t *testing.T) {
 }
 
 func TestLeetcodeUserSubmissionsHappyPath(t *testing.T) {
-	fakeGraphQL(t, "getRecentSubmissions", map[string]any{
+	withFakeLeetcode(t, "getRecentSubmissions", map[string]any{
 		"username": "jimmytrivedi",
 		"limit":    float64(2), // JSON numbers decode into float64 in map[string]any.
 	}, `{"data":{"recentSubmissionList":[
@@ -69,46 +66,8 @@ func TestLeetcodeUserSubmissionsHappyPath(t *testing.T) {
 }
 
 func TestLeetcodeUserExistsReturnsTrue(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Fatalf("expected POST request, got %s", r.Method)
-		}
-
-		if r.Header.Get("Content-Type") != "application/json" {
-			t.Fatalf("expected content type application/json, got %s", r.Header.Get("Content-Type"))
-		}
-
-		var body graphQLRequest
-		err := json.NewDecoder(r.Body).Decode(&body)
-		if err != nil {
-			t.Fatalf("expected valid GraphQL request body, got %v", err)
-		}
-
-		if body.Variables["username"] != "jimmytrivedi" {
-			t.Fatalf("expected username variable %q, got %v", "jimmytrivedi", body.Variables["username"])
-		}
-
-		writeJSON(w, http.StatusOK, graphQLResponse{
-			Data: struct {
-				MatchedUser *struct {
-					Username string `json:"username"`
-				} `json:"matchedUser"`
-			}{
-				MatchedUser: &struct {
-					Username string `json:"username"`
-				}{
-					Username: "jimmytrivedi",
-				},
-			},
-		})
-	}))
-	defer server.Close()
-
-	oldLeetcode := leetcode
-	leetcode = server.URL
-	defer func() {
-		leetcode = oldLeetcode
-	}()
+	withFakeLeetcode(t, "getUser", map[string]any{"username": "jimmytrivedi"},
+		`{"data":{"matchedUser":{"username":"jimmytrivedi"}}}`)
 
 	exists, err := leetcodeUserExists(context.Background(), "jimmytrivedi")
 	if err != nil {

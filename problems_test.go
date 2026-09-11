@@ -7,7 +7,7 @@ import (
 )
 
 func TestLeetcodeProblemNotFound(t *testing.T) {
-	fakeGraphQL(t, "getProblem", map[string]any{"titleSlug": "missing-problem"},
+	withFakeLeetcode(t, "getProblem", map[string]any{"titleSlug": "missing-problem"},
 		`{"data":{"question":null}}`)
 
 	_, err := leetcodeProblem(context.Background(), "missing-problem")
