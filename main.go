@@ -3,21 +3,25 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
 func main() {
-
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	handler := newServerHandler()
 	server := &http.Server{
-		Addr:              ":8080",
+		Addr:              ":" + port,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	fmt.Println("starting server on 8080")
+	fmt.Println("starting server on", port)
 	err := server.ListenAndServe()
 	if err != nil {
 		fmt.Println("server error: ", err)
