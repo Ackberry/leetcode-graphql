@@ -1,6 +1,20 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"testing"
+)
+
+func TestLeetcodeProblemNotFound(t *testing.T) {
+	fakeGraphQL(t, "getProblem", map[string]any{"titleSlug": "missing-problem"},
+		`{"data":{"question":null}}`)
+
+	_, err := leetcodeProblem(context.Background(), "missing-problem")
+	if !errors.Is(err, errProblemNotFound) {
+		t.Fatalf("expected errProblemNotFound, got %v", err)
+	}
+}
 
 func TestHTMLToTextRemovesTags(t *testing.T) {
 	got := htmlToText("<p>You are given an <strong>array</strong>.</p>")
