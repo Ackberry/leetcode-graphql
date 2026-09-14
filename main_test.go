@@ -267,3 +267,64 @@ func TestUserExistsHandlerReturnsUpstreamError(t *testing.T) {
 		t.Fatalf("expected error %q, got %q", "failed to connect to leetcode. try again", body.Error)
 	}
 }
+
+func TestUserProfileHandlerReturnsProfile(t *testing.T) {
+	withFakeLeetcode(t, "getUserProfile", map[string]any{"username": "jimmytrivedi"}, `{
+		"data": {
+			"matchedUser": {
+				"username": "jimmytrivedi",
+				"githubUrl": "https://github.com/jimmytrivedi",
+				"twitterUrl": "https://x.com/MrJimmyTrivedi",
+				"linkedinUrl": "https://linkedin.com/in/jimmytrivedi",
+				"profile": {
+					"realName": "Jimmy Trivedi",
+					"aboutMe": "Software engineer",
+					"userAvatar": "https://assets.leetcode.com/users/jimmytrivedi/avatar.png",
+					"countryName": "India",
+					"company": "Zivame",
+					"school": "Gujarat University",
+					"websites": ["https://jimmytrivedi.in"],
+					"skillTags": ["android", "kotlin", "java"],
+					"ranking": 1016466,
+					"reputation": 12,
+					"starRating": 2
+				}
+			}
+		}
+	}`)
+
+	handler := newServerHandler()
+	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/profile", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var body userProfileResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+
+	if body.Username != "jimmytrivedi" {
+		t.Fatalf("expected username %q, got %q", "jimmytrivedi", body.Username)
+	}
+	if body.GithubURL != "https://github.com/jimmytrivedi" {
+		t.Fatalf("expected github URL to round-trip, got %q", body.GithubURL)
+	}
+	if body.Profile.RealName != "Jimmy Trivedi" {
+		t.Fatalf("expected real name %q, got %q", "Jimmy Trivedi", body.Profile.RealName)
+	}
+	if body.Profile.Ranking != 1016466 {
+		t.Fatalf("expected ranking 1016466, got %d", body.Profile.Ranking)
+	}
+	if len(body.Profile.SkillTags) != 3 || body.Profile.SkillTags[0] != "android" {
+		t.Fatalf("expected skill tags to round-trip, got %+v", body.Profile.SkillTags)
+	}
+}
