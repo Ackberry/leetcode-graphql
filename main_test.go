@@ -231,3 +231,39 @@ func TestUserExistsHandlerReturnsFalse(t *testing.T) {
 		t.Fatalf("expected response %+v, got %+v", want, body)
 	}
 }
+
+func TestUserExistsHandlerReturnsUpstreamError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "upstream unavailable", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	oldLeetcode := leetcode
+	leetcode = server.URL
+	defer func() {
+		leetcode = oldLeetcode
+	}()
+
+	handler := newServerHandler()
+	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/exists", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", resp.StatusCode)
+	}
+
+	var body errorResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+
+	if body.Error != "failed to connect to leetcode. try again" {
+		t.Fatalf("expected error %q, got %q", "failed to connect to leetcode. try again", body.Error)
+	}
+}
