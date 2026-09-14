@@ -559,3 +559,43 @@ func TestHandlersReturnNotFound(t *testing.T) {
 		})
 	}
 }
+
+func TestSubmissionsHandlerRejectsInvalidLimit(t *testing.T) {
+	handler := newServerHandler()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "non integer", path: "/users/jimmytrivedi/submissions?limit=abc"},
+		{name: "zero", path: "/users/jimmytrivedi/submissions?limit=0"},
+		{name: "negative", path: "/users/jimmytrivedi/submissions?limit=-1"},
+		{name: "above max", path: "/users/jimmytrivedi/submissions?limit=21"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			recorder := httptest.NewRecorder()
+
+			handler.ServeHTTP(recorder, req)
+
+			resp := recorder.Result()
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("expected status 400, got %d", resp.StatusCode)
+			}
+
+			var body errorResponse
+			err := json.NewDecoder(resp.Body).Decode(&body)
+			if err != nil {
+				t.Fatalf("expected valid JSON body, got %v", err)
+			}
+
+			if body.Error != "limit must be an integer between 1 and 20" {
+				t.Fatalf("expected error %q, got %q", "limit must be an integer between 1 and 20", body.Error)
+			}
+		})
+	}
+}
