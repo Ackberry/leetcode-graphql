@@ -432,3 +432,58 @@ func TestUserSubmissionsHandlerReturnsSubmissions(t *testing.T) {
 		t.Fatalf("expected response %+v, got %+v", want, body)
 	}
 }
+
+func TestProblemHandlerReturnsProblem(t *testing.T) {
+	withFakeLeetcode(t, "getProblem", map[string]any{"titleSlug": "two-sum"}, `{
+		"data": {
+			"question": {
+				"questionFrontendId": "1",
+				"title": "Two Sum",
+				"titleSlug": "two-sum",
+				"difficulty": "Easy",
+				"isPaidOnly": false,
+				"acRate": 58.09,
+				"likes": 69861,
+				"dislikes": 2607,
+				"content": "<p>You are given an <strong>array</strong>.</p><ul><li><code>2 &lt;= nums.length &lt;= 10<sup>4</sup></code></li></ul>",
+				"topicTags": [
+					{"name": "Array", "slug": "array"},
+					{"name": "Hash Table", "slug": "hash-table"}
+				]
+			}
+		}
+	}`)
+
+	handler := newServerHandler()
+	req := httptest.NewRequest(http.MethodGet, "/problems/two-sum", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var body problemResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+
+	if body.TitleSlug != "two-sum" {
+		t.Fatalf("expected title slug %q, got %q", "two-sum", body.TitleSlug)
+	}
+	if body.Content != "You are given an array.\n\n- 2 <= nums.length <= 10^4" {
+		t.Fatalf("expected plain text content, got %q", body.Content)
+	}
+	wantTags := []topicTag{
+		{Name: "Array", Slug: "array"},
+		{Name: "Hash Table", Slug: "hash-table"},
+	}
+	if !reflect.DeepEqual(body.TopicTags, wantTags) {
+		t.Fatalf("expected topic tags %+v, got %+v", wantTags, body.TopicTags)
+	}
+}
