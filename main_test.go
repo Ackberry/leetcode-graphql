@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -378,5 +379,56 @@ func TestUserStatsHandlerReturnsStats(t *testing.T) {
 	}
 	if body.SubmitStats.TotalSubmissions[1] != (submissionStat{Difficulty: "Easy", Count: 22, Submissions: 35}) {
 		t.Fatalf("expected total stats to round-trip, got %+v", body.SubmitStats.TotalSubmissions[1])
+	}
+}
+
+func TestUserSubmissionsHandlerReturnsSubmissions(t *testing.T) {
+	withFakeLeetcodeCalls(t,
+		fakeGraphQLCall{
+			operation: "getUser",
+			variables: map[string]any{"username": "jimmytrivedi"},
+			response:  `{"data":{"matchedUser":{"username":"jimmytrivedi"}}}`,
+		},
+		fakeGraphQLCall{
+			operation: "getRecentSubmissions",
+			variables: map[string]any{
+				"username": "jimmytrivedi",
+				"limit":    float64(2),
+			},
+			response: `{"data":{"recentSubmissionList":[
+				{"title":"Two Sum","titleSlug":"two-sum","timestamp":"1725000000","statusDisplay":"Accepted","lang":"golang"},
+				{"title":"Add Two Numbers","titleSlug":"add-two-numbers","timestamp":"1724990000","statusDisplay":"Wrong Answer","lang":"python3"}
+			]}}`,
+		},
+	)
+
+	handler := newServerHandler()
+	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/submissions?limit=2", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var body userSubmissionsResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+
+	want := userSubmissionsResponse{
+		Username: "jimmytrivedi",
+		RecentSubmissions: []userSubmission{
+			{Title: "Two Sum", TitleSlug: "two-sum", Timestamp: "1725000000", StatusDisplay: "Accepted", Lang: "golang"},
+			{Title: "Add Two Numbers", TitleSlug: "add-two-numbers", Timestamp: "1724990000", StatusDisplay: "Wrong Answer", Lang: "python3"},
+		},
+	}
+	if !reflect.DeepEqual(body, want) {
+		t.Fatalf("expected response %+v, got %+v", want, body)
 	}
 }
