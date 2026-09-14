@@ -199,3 +199,35 @@ func TestUserExistsHandlerReturnsTrue(t *testing.T) {
 		t.Fatalf("expected response %+v, got %+v", want, body)
 	}
 }
+
+func TestUserExistsHandlerReturnsFalse(t *testing.T) {
+	withFakeLeetcode(t, "getUser", map[string]any{"username": "missing-user"},
+		`{"data":{"matchedUser":null}}`)
+
+	handler := newServerHandler()
+	req := httptest.NewRequest(http.MethodGet, "/users/missing-user/exists", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var body userExistsResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+
+	want := userExistsResponse{
+		Username: "missing-user",
+		Exists:   false,
+	}
+	if body != want {
+		t.Fatalf("expected response %+v, got %+v", want, body)
+	}
+}
