@@ -599,3 +599,64 @@ func TestSubmissionsHandlerRejectsInvalidLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestHandlersReturnUpstreamError(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		operation string
+		variables map[string]any
+	}{
+		{
+			name:      "profile upstream error",
+			path:      "/users/jimmytrivedi/profile",
+			operation: "getUserProfile",
+			variables: map[string]any{"username": "jimmytrivedi"},
+		},
+		{
+			name:      "stats upstream error",
+			path:      "/users/jimmytrivedi/stats",
+			operation: "getUserStats",
+			variables: map[string]any{"username": "jimmytrivedi"},
+		},
+		{
+			name:      "problem upstream error",
+			path:      "/problems/two-sum",
+			operation: "getProblem",
+			variables: map[string]any{"titleSlug": "two-sum"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withFakeLeetcodeCalls(t, fakeGraphQLCall{
+				operation: tt.operation,
+				variables: tt.variables,
+				status:    http.StatusInternalServerError,
+				response:  `{"error":"upstream unavailable"}`,
+			})
+
+			handler := newServerHandler()
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			recorder := httptest.NewRecorder()
+
+			handler.ServeHTTP(recorder, req)
+
+			resp := recorder.Result()
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusInternalServerError {
+				t.Fatalf("expected status 500, got %d", resp.StatusCode)
+			}
+
+			var body errorResponse
+			err := json.NewDecoder(resp.Body).Decode(&body)
+			if err != nil {
+				t.Fatalf("expected valid JSON body, got %v", err)
+			}
+			if body.Error != "failed to connect to leetcode. try again" {
+				t.Fatalf("expected error %q, got %q", "failed to connect to leetcode. try again", body.Error)
+			}
+		})
+	}
+}
