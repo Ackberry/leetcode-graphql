@@ -487,3 +487,75 @@ func TestProblemHandlerReturnsProblem(t *testing.T) {
 		t.Fatalf("expected topic tags %+v, got %+v", wantTags, body.TopicTags)
 	}
 }
+
+func TestHandlersReturnNotFound(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		operation string
+		variables map[string]any
+		response  string
+		wantError string
+	}{
+		{
+			name:      "profile missing user",
+			path:      "/users/missing-user/profile",
+			operation: "getUserProfile",
+			variables: map[string]any{"username": "missing-user"},
+			response:  `{"data":{"matchedUser":null}}`,
+			wantError: "user not found",
+		},
+		{
+			name:      "stats missing user",
+			path:      "/users/missing-user/stats",
+			operation: "getUserStats",
+			variables: map[string]any{"username": "missing-user"},
+			response:  `{"data":{"matchedUser":null}}`,
+			wantError: "user not found",
+		},
+		{
+			name:      "submissions missing user",
+			path:      "/users/missing-user/submissions",
+			operation: "getUser",
+			variables: map[string]any{"username": "missing-user"},
+			response:  `{"data":{"matchedUser":null}}`,
+			wantError: "user not found",
+		},
+		{
+			name:      "missing problem",
+			path:      "/problems/missing-problem",
+			operation: "getProblem",
+			variables: map[string]any{"titleSlug": "missing-problem"},
+			response:  `{"data":{"question":null}}`,
+			wantError: "problem not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withFakeLeetcode(t, tt.operation, tt.variables, tt.response)
+
+			handler := newServerHandler()
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			recorder := httptest.NewRecorder()
+
+			handler.ServeHTTP(recorder, req)
+
+			resp := recorder.Result()
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusNotFound {
+				t.Fatalf("expected status 404, got %d", resp.StatusCode)
+			}
+
+			var body errorResponse
+			err := json.NewDecoder(resp.Body).Decode(&body)
+			if err != nil {
+				t.Fatalf("expected valid JSON body, got %v", err)
+			}
+			if body.Error != tt.wantError {
+				t.Fatalf("expected error %q, got %q", tt.wantError, body.Error)
+			}
+		})
+	}
+}
