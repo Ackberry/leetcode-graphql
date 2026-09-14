@@ -328,3 +328,55 @@ func TestUserProfileHandlerReturnsProfile(t *testing.T) {
 		t.Fatalf("expected skill tags to round-trip, got %+v", body.Profile.SkillTags)
 	}
 }
+
+func TestUserStatsHandlerReturnsStats(t *testing.T) {
+	withFakeLeetcode(t, "getUserStats", map[string]any{"username": "jimmytrivedi"}, `{
+		"data": {
+			"matchedUser": {
+				"username": "jimmytrivedi",
+				"submitStats": {
+					"acSubmissionNum": [
+						{"difficulty": "All", "count": 30, "submissions": 40},
+						{"difficulty": "Easy", "count": 20, "submissions": 25}
+					],
+					"totalSubmissionNum": [
+						{"difficulty": "All", "count": 35, "submissions": 65},
+						{"difficulty": "Easy", "count": 22, "submissions": 35}
+					]
+				}
+			}
+		}
+	}`)
+
+	handler := newServerHandler()
+	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/stats", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var body userStatsResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+
+	if body.Username != "jimmytrivedi" {
+		t.Fatalf("expected username %q, got %q", "jimmytrivedi", body.Username)
+	}
+	if len(body.SubmitStats.AcceptedSubmissions) != 2 {
+		t.Fatalf("expected 2 accepted submission buckets, got %+v", body.SubmitStats.AcceptedSubmissions)
+	}
+	if body.SubmitStats.AcceptedSubmissions[0] != (submissionStat{Difficulty: "All", Count: 30, Submissions: 40}) {
+		t.Fatalf("expected accepted stats to round-trip, got %+v", body.SubmitStats.AcceptedSubmissions[0])
+	}
+	if body.SubmitStats.TotalSubmissions[1] != (submissionStat{Difficulty: "Easy", Count: 22, Submissions: 35}) {
+		t.Fatalf("expected total stats to round-trip, got %+v", body.SubmitStats.TotalSubmissions[1])
+	}
+}
