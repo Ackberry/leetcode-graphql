@@ -167,3 +167,35 @@ func TestEmptyUsernameReturnsBadRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestUserExistsHandlerReturnsTrue(t *testing.T) {
+	withFakeLeetcode(t, "getUser", map[string]any{"username": "jimmytrivedi"},
+		`{"data":{"matchedUser":{"username":"jimmytrivedi"}}}`)
+
+	handler := newServerHandler()
+	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/exists", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var body userExistsResponse
+	err := json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+
+	want := userExistsResponse{
+		Username: "jimmytrivedi",
+		Exists:   true,
+	}
+	if body != want {
+		t.Fatalf("expected response %+v, got %+v", want, body)
+	}
+}
