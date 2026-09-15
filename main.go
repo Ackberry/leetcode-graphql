@@ -27,7 +27,7 @@ func run() error {
 	if port == "" {
 		port = "8080"
 	}
-	handler := newServerHandler()
+	handler := logRequests(os.Stdout, newServerHandler())
 	server := &http.Server{
 		Addr:              ":" + port,
 		Handler:           handler,
