@@ -8,6 +8,38 @@ import (
 	"testing"
 )
 
+func performRequest(handler http.Handler, path string) *http.Response {
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	return recorder.Result()
+}
+
+func decodeJSONBody(t *testing.T, resp *http.Response, body any) {
+	t.Helper()
+	err := json.NewDecoder(resp.Body).Decode(body)
+	if err != nil {
+		t.Fatalf("expected valid JSON body, got %v", err)
+	}
+}
+
+func assertErrorResponse(t *testing.T, resp *http.Response, status int, message string) {
+	t.Helper()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != status {
+		t.Fatalf("expected status %d, got %d", status, resp.StatusCode)
+	}
+
+	var body errorResponse
+	decodeJSONBody(t, resp, &body)
+	if body.Error != message {
+		t.Fatalf("expected error %q, got %q", message, body.Error)
+	}
+}
+
 func TestEmptyUsernameReturnsBadRequest(t *testing.T) {
 	handler := newServerHandler()
 
@@ -23,26 +55,8 @@ func TestEmptyUsernameReturnsBadRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
-			recorder := httptest.NewRecorder()
-			handler.ServeHTTP(recorder, req)
-
-			resp := recorder.Result()
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusBadRequest {
-				t.Fatalf("expected status 400, got %d", resp.StatusCode)
-			}
-
-			var body errorResponse
-			err := json.NewDecoder(resp.Body).Decode(&body)
-			if err != nil {
-				t.Fatalf("expected valid JSON body, got %v", err)
-			}
-
-			if body.Error != "username is required" {
-				t.Fatalf("expected error %q, got %q", "username is required", body.Error)
-			}
+			resp := performRequest(handler, tt.path)
+			assertErrorResponse(t, resp, http.StatusBadRequest, "username is required")
 		})
 	}
 }
@@ -124,27 +138,8 @@ func TestUserExistsHandlerReturnsUpstreamError(t *testing.T) {
 	}()
 
 	handler := newServerHandler()
-	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/exists", nil)
-	recorder := httptest.NewRecorder()
-
-	handler.ServeHTTP(recorder, req)
-
-	resp := recorder.Result()
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", resp.StatusCode)
-	}
-
-	var body errorResponse
-	err := json.NewDecoder(resp.Body).Decode(&body)
-	if err != nil {
-		t.Fatalf("expected valid JSON body, got %v", err)
-	}
-
-	if body.Error != "failed to connect to leetcode. try again" {
-		t.Fatalf("expected error %q, got %q", "failed to connect to leetcode. try again", body.Error)
-	}
+	resp := performRequest(handler, "/users/jimmytrivedi/exists")
+	assertErrorResponse(t, resp, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 }
 
 func TestUserProfileHandlerReturnsProfile(t *testing.T) {
@@ -414,26 +409,8 @@ func TestHandlersReturnNotFound(t *testing.T) {
 			withFakeLeetcode(t, tt.operation, tt.variables, tt.response)
 
 			handler := newServerHandler()
-			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
-			recorder := httptest.NewRecorder()
-
-			handler.ServeHTTP(recorder, req)
-
-			resp := recorder.Result()
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusNotFound {
-				t.Fatalf("expected status 404, got %d", resp.StatusCode)
-			}
-
-			var body errorResponse
-			err := json.NewDecoder(resp.Body).Decode(&body)
-			if err != nil {
-				t.Fatalf("expected valid JSON body, got %v", err)
-			}
-			if body.Error != tt.wantError {
-				t.Fatalf("expected error %q, got %q", tt.wantError, body.Error)
-			}
+			resp := performRequest(handler, tt.path)
+			assertErrorResponse(t, resp, http.StatusNotFound, tt.wantError)
 		})
 	}
 }
@@ -453,27 +430,8 @@ func TestSubmissionsHandlerRejectsInvalidLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
-			recorder := httptest.NewRecorder()
-
-			handler.ServeHTTP(recorder, req)
-
-			resp := recorder.Result()
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusBadRequest {
-				t.Fatalf("expected status 400, got %d", resp.StatusCode)
-			}
-
-			var body errorResponse
-			err := json.NewDecoder(resp.Body).Decode(&body)
-			if err != nil {
-				t.Fatalf("expected valid JSON body, got %v", err)
-			}
-
-			if body.Error != "limit must be an integer between 1 and 20" {
-				t.Fatalf("expected error %q, got %q", "limit must be an integer between 1 and 20", body.Error)
-			}
+			resp := performRequest(handler, tt.path)
+			assertErrorResponse(t, resp, http.StatusBadRequest, "limit must be an integer between 1 and 20")
 		})
 	}
 }
@@ -515,26 +473,8 @@ func TestHandlersReturnUpstreamError(t *testing.T) {
 			})
 
 			handler := newServerHandler()
-			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
-			recorder := httptest.NewRecorder()
-
-			handler.ServeHTTP(recorder, req)
-
-			resp := recorder.Result()
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusInternalServerError {
-				t.Fatalf("expected status 500, got %d", resp.StatusCode)
-			}
-
-			var body errorResponse
-			err := json.NewDecoder(resp.Body).Decode(&body)
-			if err != nil {
-				t.Fatalf("expected valid JSON body, got %v", err)
-			}
-			if body.Error != "failed to connect to leetcode. try again" {
-				t.Fatalf("expected error %q, got %q", "failed to connect to leetcode. try again", body.Error)
-			}
+			resp := performRequest(handler, tt.path)
+			assertErrorResponse(t, resp, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 		})
 	}
 }
@@ -558,25 +498,6 @@ func TestSubmissionsHandlerReturnsUpstreamErrorAfterUserCheck(t *testing.T) {
 	)
 
 	handler := newServerHandler()
-	req := httptest.NewRequest(http.MethodGet, "/users/jimmytrivedi/submissions", nil)
-	recorder := httptest.NewRecorder()
-
-	handler.ServeHTTP(recorder, req)
-
-	resp := recorder.Result()
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", resp.StatusCode)
-	}
-
-	var body errorResponse
-	err := json.NewDecoder(resp.Body).Decode(&body)
-	if err != nil {
-		t.Fatalf("expected valid JSON body, got %v", err)
-	}
-
-	if body.Error != "failed to connect to leetcode. try again" {
-		t.Fatalf("expected error %q, got %q", "failed to connect to leetcode. try again", body.Error)
-	}
+	resp := performRequest(handler, "/users/jimmytrivedi/submissions")
+	assertErrorResponse(t, resp, http.StatusInternalServerError, "failed to connect to leetcode. try again")
 }
